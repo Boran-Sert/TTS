@@ -1,0 +1,71 @@
+{
+  "schema_version": 2,
+  "model_name": "Trendyol-TTS",
+  "target_repository": "Trendyol/Trendyol-TTS",
+  "artifact_type": "merged_voxcpm2_lora",
+  "base_model": "openbmb/VoxCPM2",
+  "base_snapshot": "bffb3df5a29440629464e5e839f4d214c8714c3d",
+  "adapter_source": "Trendyol-TTS",
+  "source_checkpoint_repository": "Trendyol/Trendyol-TTS",
+  "checkpoint_name": "step_0002000",
+  "checkpoint_step": 2000,
+  "training_state": {
+    "step": 2000
+  },
+  "merge": {
+    "method": "LoRA adapter merged into VoxCPM2 base weights",
+    "merge_scale": 1.0,
+    "merged_target_weights": 192,
+    "output_weights": "model.safetensors",
+    "preserved_adapter_directory": "lora_adapter/"
+  },
+  "lora_config": {
+    "base_model": "openbmb/VoxCPM2",
+    "source_base_model_path": "/workspace/models/VoxCPM2/",
+    "lora_config": {
+      "r": 64,
+      "alpha": 64,
+      "dropout": 0.0,
+      "enable_lm": true,
+      "enable_dit": true,
+      "enable_proj": false,
+      "target_modules_lm": [
+        "q_proj",
+        "v_proj",
+        "k_proj",
+        "o_proj"
+      ],
+      "target_modules_dit": [
+        "q_proj",
+        "v_proj",
+        "k_proj",
+        "o_proj"
+      ],
+      "target_proj_modules": [
+        "enc_to_lm_proj",
+        "lm_to_dit_proj",
+        "res_to_dit_proj",
+        "fusion_concat_proj"
+      ]
+    }
+  },
+  "recommended_inference": {
+    "clean_default": {
+      "cfg_value": 2.0,
+      "inference_timesteps": 16
+    },
+    "expressive_candidate": {
+      "cfg_value": 1.5,
+      "inference_timesteps": 16
+    },
+    "avoid_as_general_default": {
+      "cfg_value": 2.5,
+      "reason": "Internal proxy checks showed some generated samples peaking too close to 0 dBFS."
+    }
+  },
+  "notes": [
+    "This manifest is prepared for the Hugging Face model repository Trendyol/Trendyol-TTS.",
+    "The released artifact is the merged step_0002000 VoxCPM2 model with the Turkish LoRA adapter applied.",
+    "The lora_adapter/ directory is preserved for provenance and auditability."
+  ]
+}

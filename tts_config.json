@@ -1,0 +1,43 @@
+{
+  "model": {
+    "model_path": "./Trendyol-TTS",
+    "inference_timesteps": 6,
+    "adaptive_timesteps": false,
+    "cfg_value": 2.5
+  },
+  "streaming": {
+    "chunk_duration_ms": 600,
+    "output_format": "pcm16_le",
+    "enable_lookbehind": true,
+    "lookbehind_mode": "anchor"
+  },
+  "text_processing": {
+    "sentence_delimiters": ".?!…,;\n",
+    "flush_timeout_ms": 500.0,
+    "min_chars": 60
+  },
+  "system": {
+    "voxcpm_gpu_ids": [
+      0
+    ],
+    "use_torch_compile": false,
+    "piper_fallback_enabled": true,
+    "piper_fallback_queue_threshold": 10
+  },
+  "api": {
+    "cors_allowed_origins": [
+      "http://localhost:3000",
+      "https://internal-dashboard.trendyol.com"
+    ],
+    "cors_allowed_methods": [
+      "GET",
+      "POST",
+      "OPTIONS"
+    ],
+    "cors_allowed_headers": [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With"
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Large model files / weights (over GitHub's file limit)
+*.safetensors
+*.pth
+*.onnx
+*.bin
+*.pt
+*.ckpt
+.cache/
+
+# Log files
+logs/
+*.log
+
+# Environment variables / secrets
+.env
+.env.*
+
+# Local/OS files
+.DS_Store
+Thumbs.db
