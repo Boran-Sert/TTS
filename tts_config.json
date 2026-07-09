@@ -1,12 +1,12 @@
 {
   "model": {
     "model_path": "./Trendyol-TTS",
-    "inference_timesteps": 6,
+    "inference_timesteps": 8,
     "adaptive_timesteps": false,
-    "cfg_value": 2.5
+    "cfg_value": 2.8
   },
   "streaming": {
-    "chunk_duration_ms": 600,
+    "chunk_duration_ms": 1200,
     "output_format": "pcm16_le",
     "enable_lookbehind": true,
     "lookbehind_mode": "anchor"
@@ -14,13 +14,13 @@
   "text_processing": {
     "sentence_delimiters": ".?!…,;\n",
     "flush_timeout_ms": 500.0,
-    "min_chars": 60
+    "min_chars": 30
   },
   "system": {
     "voxcpm_gpu_ids": [
       0
     ],
-    "use_torch_compile": false,
+    "use_torch_compile": true,
     "piper_fallback_enabled": true,
     "piper_fallback_queue_threshold": 10
   },

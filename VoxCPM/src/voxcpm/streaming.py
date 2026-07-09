@@ -24,13 +24,16 @@ class AudioFormatConverter:
     def to_pcm16_le(audio_np: np.ndarray) -> bytes:
         """ Vectorized conversion to Little-Endian 16-bit PCM."""
         audio_clipped = np.clip(audio_np, -1.0, 1.0)
-        pcm_16 = (audio_clipped * 32767.0).astype('<i2')
+        audio_clipped *= 32767.0
+        pcm_16 = audio_clipped.astype('<i2')
         return pcm_16.tobytes()
 
     @staticmethod
     def to_wav(audio_np: np.ndarray, sample_rate: int) -> bytes:
         """ Vectorized WAV header + PCM16 data."""
-        pcm_16 = (np.clip(audio_np, -1.0, 1.0) * 32767.0).astype('<i2')
+        audio_clipped = np.clip(audio_np, -1.0, 1.0)
+        audio_clipped *= 32767.0
+        pcm_16 = audio_clipped.astype('<i2')
         wav_buffer = io.BytesIO()
         scipy.io.wavfile.write(wav_buffer, sample_rate, pcm_16)
         return wav_buffer.getvalue()
