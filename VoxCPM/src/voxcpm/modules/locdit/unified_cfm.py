@@ -76,8 +76,8 @@ class UnifiedCFM(torch.nn.Module):
         )
 
     def optimized_scale(self, positive_flat: torch.Tensor, negative_flat: torch.Tensor):
-        dot_product = torch.sum(positive_flat * negative_flat, dim=1, keepdim=True)
-        squared_norm = torch.sum(negative_flat**2, dim=1, keepdim=True) + 1e-8
+        dot_product = torch.linalg.vecdot(positive_flat, negative_flat, dim=1).unsqueeze(1)
+        squared_norm = torch.linalg.vecdot(negative_flat, negative_flat, dim=1).unsqueeze(1) + 1e-8
         st_star = dot_product / squared_norm
         return st_star
 
@@ -94,27 +94,31 @@ class UnifiedCFM(torch.nn.Module):
 
         sol = []
         zero_init_steps = max(1, int(len(t_span) * 0.04))
+        
+        # Pre-allocate loop tensors to prevent VRAM fragmentation
+        b_max = x.size(0)
+        x_in = torch.zeros([2 * b_max, self.in_channels, x.size(2)], device=x.device, dtype=x.dtype)
+        mu_in = torch.zeros([2 * b_max, mu.size(1)], device=x.device, dtype=x.dtype)
+        t_in = torch.zeros([2 * b_max], device=x.device, dtype=x.dtype)
+        dt_in = torch.zeros([2 * b_max], device=x.device, dtype=x.dtype)
+        cond_in = torch.zeros([2 * b_max, self.in_channels, cond.size(2)], device=x.device, dtype=x.dtype)
+
         for step in range(1, len(t_span)):
             if use_cfg_zero_star and step <= zero_init_steps:
                 dphi_dt = torch.zeros_like(x)
             else:
                 # Classifier-Free Guidance inference introduced in VoiceBox
                 b = x.size(0)
-                x_in = torch.zeros([2 * b, self.in_channels, x.size(2)], device=x.device, dtype=x.dtype)
-                mu_in = torch.zeros([2 * b, mu.size(1)], device=x.device, dtype=x.dtype)
-                t_in = torch.zeros([2 * b], device=x.device, dtype=x.dtype)
-                dt_in = torch.zeros([2 * b], device=x.device, dtype=x.dtype)
-                cond_in = torch.zeros([2 * b, self.in_channels, cond.size(2)], device=x.device, dtype=x.dtype)
-                x_in[:b], x_in[b:] = x, x
+                x_in[:b], x_in[b:2*b] = x, x
                 mu_in[:b] = mu
-                t_in[:b], t_in[b:] = t.unsqueeze(0), t.unsqueeze(0)
-                dt_in[:b], dt_in[b:] = dt.unsqueeze(0), dt.unsqueeze(0)
+                t_in[:b], t_in[b:2*b] = t.unsqueeze(0), t.unsqueeze(0)
+                dt_in[:b], dt_in[b:2*b] = dt.unsqueeze(0), dt.unsqueeze(0)
                 # not used now
                 if not self.mean_mode:
-                    dt_in = torch.zeros_like(dt_in)
-                cond_in[:b], cond_in[b:] = cond, cond
+                    dt_in[:2*b].zero_()
+                cond_in[:b], cond_in[b:2*b] = cond, cond
 
-                dphi_dt = self.estimator(x_in, mu_in, t_in, cond_in, dt_in)
+                dphi_dt = self.estimator(x_in[:2*b], mu_in[:2*b], t_in[:2*b], cond_in[:2*b], dt_in[:2*b])
                 dphi_dt, cfg_dphi_dt = torch.split(dphi_dt, [x.size(0), x.size(0)], dim=0)
 
                 if use_cfg_zero_star:

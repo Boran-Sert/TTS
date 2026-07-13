@@ -200,13 +200,13 @@ class VoxCPM:
         reference_wav_path: str = None,
         cfg_value: Optional[float] = None,
         inference_timesteps: Optional[int] = None,
-        min_len: int = 2,
-        max_len: int = 4096,
+        min_len: Optional[int] = None,
+        max_len: Optional[int] = None,
         normalize: bool = False,
         denoise: bool = False,
-        retry_badcase: bool = False,
-        retry_badcase_max_times: int = 3,
-        retry_badcase_ratio_threshold: float = 6.0,
+        retry_badcase: Optional[bool] = None,
+        retry_badcase_max_times: Optional[int] = None,
+        retry_badcase_ratio_threshold: Optional[float] = None,
         seed: Optional[int] = None,
     ) -> Generator[AudioChunk, None, None]:
         """Yields audio chunks at specified durations during the generation process."""
@@ -416,7 +416,9 @@ class VoxCPM:
                             combined_np = np.concatenate(full_sentence_audio_np, axis=-1)
                             import scipy.io.wavfile
                             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                            pcm_16 = (np.clip(combined_np, -1.0, 1.0) * 32767.0).astype('<i2')
+                            np.clip(combined_np, -1.0, 1.0, out=combined_np)
+                            combined_np *= 32767.0
+                            pcm_16 = combined_np.astype('<i2')
                             scipy.io.wavfile.write(tmp.name, sample_rate, pcm_16)
                             temp_files.append(tmp.name)
                             
@@ -428,7 +430,9 @@ class VoxCPM:
                         combined_np = np.concatenate(full_sentence_audio_np, axis=-1)
                         import scipy.io.wavfile
                         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                        pcm_16 = (np.clip(combined_np, -1.0, 1.0) * 32767.0).astype('<i2')
+                        np.clip(combined_np, -1.0, 1.0, out=combined_np)
+                        combined_np *= 32767.0
+                        pcm_16 = combined_np.astype('<i2')
                         scipy.io.wavfile.write(tmp.name, sample_rate, pcm_16)
                         temp_files.append(tmp.name)
                         
@@ -462,15 +466,15 @@ class VoxCPM:
         prompt_wav_path: str = None,
         prompt_text: str = None,
         reference_wav_path: str = None,
-        cfg_value: float = 2.0,
-        inference_timesteps: int = 10,
-        min_len: int = 2,
-        max_len: int = 4096,
+        cfg_value: Optional[float] = None,
+        inference_timesteps: Optional[int] = None,
+        min_len: Optional[int] = None,
+        max_len: Optional[int] = None,
         normalize: bool = False,
         denoise: bool = False,
-        retry_badcase: bool = True,
-        retry_badcase_max_times: int = 3,
-        retry_badcase_ratio_threshold: float = 6.0,
+        retry_badcase: Optional[bool] = None,
+        retry_badcase_max_times: Optional[int] = None,
+        retry_badcase_ratio_threshold: Optional[float] = None,
         streaming: bool = False,
         seed: Optional[int] = None,
     ) -> Generator[np.ndarray, None, None]:
@@ -503,6 +507,14 @@ class VoxCPM:
         """
         if not isinstance(text, str) or not text.strip():
             raise ValueError("target text must be a non-empty string")
+
+        if cfg_value is None: cfg_value = config_instance.model.cfg_value
+        if inference_timesteps is None: inference_timesteps = config_instance.model.inference_timesteps
+        if min_len is None: min_len = config_instance.model.min_len
+        if max_len is None: max_len = config_instance.model.max_len
+        if retry_badcase is None: retry_badcase = config_instance.model.retry_badcase
+        if retry_badcase_max_times is None: retry_badcase_max_times = config_instance.model.retry_badcase_max_times
+        if retry_badcase_ratio_threshold is None: retry_badcase_ratio_threshold = config_instance.model.retry_badcase_ratio_threshold
 
         if prompt_wav_path is not None:
             if not os.path.exists(prompt_wav_path):
@@ -572,6 +584,7 @@ class VoxCPM:
                 retry_badcase_max_times=retry_badcase_max_times,
                 retry_badcase_ratio_threshold=retry_badcase_ratio_threshold,
                 streaming=streaming,
+                streaming_prefix_len=config_instance.model.streaming_prefix_len,
                 seed=seed,
             )
 

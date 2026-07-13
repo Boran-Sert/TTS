@@ -15,6 +15,12 @@ class ModelConfig(BaseModel):
     adaptive_timesteps_short: int = Field(default=6)
     adaptive_timesteps_long: int = Field(default=12)
     cfg_value: float = Field(default=2.0)
+    min_len: int = Field(default=2)
+    max_len: int = Field(default=4096)
+    retry_badcase: bool = Field(default=False)
+    retry_badcase_max_times: int = Field(default=3)
+    retry_badcase_ratio_threshold: float = Field(default=6.0)
+    streaming_prefix_len: int = Field(default=4)
 
 class StreamingConfigModel(BaseModel):
     chunk_duration_ms: int = Field(default=200)

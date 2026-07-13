@@ -2,27 +2,53 @@
   "model": {
     "model_path": "./Trendyol-TTS",
     "inference_timesteps": 8,
+    "_comment_inference_timesteps": "Sentezleme adımı sayısı (yüksek değer kaliteyi artırır, hızı düşürür).",
     "adaptive_timesteps": false,
-    "cfg_value": 2.8
+    "_comment_adaptive_timesteps": "Metin uzunluğuna göre sentezleme adım sayısının dinamik değişmesini sağlar.",
+    "cfg_value": 2.8,
+    "_comment_cfg_value": "Modelin metne bağlılık derecesi (yüksek değer netlik sağlar, doğallığı etkileyebilir).",
+    "min_len": 2,
+    "_comment_min_len": "Modelin üreteceği minimum ses parçası (patch) uzunluğu.",
+    "max_len": 4096,
+    "_comment_max_len": "Modelin tek bir sentezleme işleminde üretebileceği maksimum ses parçası uzunluğu.",
+    "retry_badcase": false,
+    "_comment_retry_badcase": "Seste bozulma veya kekeleme algılandığında sentezlemenin otomatik tekrarlanmasını sağlar.",
+    "retry_badcase_max_times": 3,
+    "_comment_retry_badcase_max_times": "Bozulma durumunda sentezlemenin en fazla kaç kez tekrarlanacağı.",
+    "retry_badcase_ratio_threshold": 6.0,
+    "_comment_retry_badcase_ratio_threshold": "Üretilen sesin metin uzunluğuna oran sınırı (aşılırsa tekrarlanır).",
+    "streaming_prefix_len": 4,
+    "_comment_streaming_prefix_len": "Akışın akıcılığı için geçmiş sentezden alınacak referans parça sayısı."
   },
   "streaming": {
-    "chunk_duration_ms": 1200,
+    "chunk_duration_ms": 800,
+    "_comment_chunk_duration_ms": "İstemciye gönderilecek her bir ses paketinin milisaniye cinsinden süresi.",
     "output_format": "pcm16_le",
+    "_comment_output_format": "Sentezlenen sesin çıkış formatı (genellikle 16-bit PCM Little Endian).",
     "enable_lookbehind": true,
-    "lookbehind_mode": "anchor"
+    "_comment_enable_lookbehind": "Uzun metinlerde sesin kalitesini korumak için önceki sesleri referans alır.",
+    "lookbehind_mode": "anchor",
+    "_comment_lookbehind_mode": "Ses referans alma yöntemi (anchor modu sesin sonradan bozulmasını engeller)."
   },
   "text_processing": {
     "sentence_delimiters": ".?!…,;\n",
+    "_comment_sentence_delimiters": "Metnin hangi noktalama işaretlerinden bölünerek senteze gönderileceğini belirler.",
     "flush_timeout_ms": 500.0,
-    "min_chars": 30
+    "_comment_flush_timeout_ms": "Tam cümle oluşmasa bile bekleyen metnin zorla sentezlenmesi için bekleme süresi.",
+    "min_chars": 30,
+    "_comment_min_chars": "Bir ses akışının tetiklenmesi için gereken minimum karakter sayısı."
   },
   "system": {
     "voxcpm_gpu_ids": [
       0
     ],
+    "_comment_voxcpm_gpu_ids": "Modelin çalıştırılacağı GPU kartlarının ID listesi.",
     "use_torch_compile": true,
+    "_comment_use_torch_compile": "PyTorch grafik derlemesini açarak GPU sentezleme hızını önemli ölçüde artırır.",
     "piper_fallback_enabled": true,
-    "piper_fallback_queue_threshold": 10
+    "_comment_piper_fallback_enabled": "GPU yoğunluğu durumunda sistemin otomatik CPU (Piper) motoruna geçişini açar.",
+    "piper_fallback_queue_threshold": 10,
+    "_comment_piper_fallback_queue_threshold": "GPU kuyruğunda kaç adet bekleyen istek biriktiğinde CPU'ya yönlendirme yapılacağı."
   },
   "api": {
     "cors_allowed_origins": [
