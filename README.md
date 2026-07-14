@@ -105,6 +105,41 @@ Sistem, istemci ile **Multiplexed WebSockets** üzerinden konuşur:
 1. **Text Frame (JSON):** Kontrol mesajları, metadata, bağlantı durumu ve cümle sonu bildirimleri.
 2. **Binary Frame (Raw Bytes):** Saf, Little-Endian formatta `PCM16` ses verisi taşır. Bu sayede iOS, Android, .NET veya Java gibi farklı istemciler bu byteları alıp doğrudan donanım ses kuyruğuna yazabilirler.
 
+### Python İçerisinden Doğrudan Kullanım (Asenkron Oynatma)
+Sistemi doğrudan bir Python projesine entegre etmek ve arka planda gecikmesiz olarak çalıştırmak oldukça basittir. Tıpkı `run_tts.py` içerisinde olduğu gibi `VoxTrendyol` sarmalayıcısını kullanabilirsiniz:
+
+```python
+import os
+import soundfile as sf
+from Trendyol_TTS.voxtrendyol import VoxTrendyol
+
+# 1. Modeli Başlat (Ağırlıkları ve sample rate'i otomatik yükler)
+vt = VoxTrendyol(model_path="Trendyol-TTS")
+
+# 2. Üretilecek Metin ve Klonlanacak Ses (Referans)
+text_to_speak = "Mastercard kredi kartımda bu ay ödemem gereken 18.450 TL borç bulunuyor."
+ref_audio = "ceren.wav/ceren.wav"
+ref_text = "Hayvanlar için hayatlarını tehlikeye atmaya hazır insanlar var."
+
+# 3. Akışı ve Oynatmayı Başlat
+wav_output = vt.smart_generate_streaming(
+    text=text_to_speak,
+    ref_audio=ref_audio,      # Klonlanacak referans ses dosyası
+    prompt_audio=ref_audio,   # Duygu ve tonlama için referans ses
+    prompt_text=ref_text,     # Referans sesin transkripti
+    cfg_value=2.0,            # Modelin tonlama sadakati
+    inference_timesteps=6,    # Hız/Kalite ayarı
+    chunk_duration_ms=200,    # Streaming parça boyutu (ms)
+    seed=42,                  # Tutarlılık
+    play=True                 # Anında, takılmadan asenkron çalmaya başla!
+)
+
+# 4. (Opsiyonel) Çıktıyı Sonradan Kaydedin
+sf.write("voice_design.wav", wav_output, vt.sample_rate)
+```
+
+**Özetle Çağrı Akışı:** Gelen metin `TextBuffer` ile anında işlenir. Ses üretildikçe `RingBuffer` aracılığıyla bellek dostu bir şekilde ana thread'de `sounddevice.RawOutputStream` ile hoparlöre iletilir ve sonunda birleştirilmiş ses dizisi geri döner.
+
 ---
 
 ## 🏗️ Mimari Geliştirmelerimiz ve Teknik Detaylar
@@ -112,14 +147,21 @@ Sistem, istemci ile **Multiplexed WebSockets** üzerinden konuşur:
 Sistem mimarisi, kurumsal standartlarda OOP ve SOLID prensiplerine sadık kalınarak tasarlanmıştır. Geliştirdiğimiz özgün mimarinin detayları şunlardır:
 
 ### 1. Bellek ve O(1) İşlem Optimizasyonları
-- **RingBuffer (Dairesel Tampon):** `streaming.py` içindeki RingBuffer dinamik genişleme yapmaz, bellek adreslemesi baştan sabit yapılır. Head/Tail işaretçileri kaydırılarak tam olarak **O(1)** hızında bellek erişimi sunar.
+- **RingBuffer (RAM Dostu Tampon):** `streaming.py` içindeki RingBuffer dinamik genişleme yapmaz, bellek adreslemesi baştan sabit yapılır. Head/Tail işaretçileri kaydırılarak tam olarak **O(1)** hızında bellek erişimi sunar. Kapasite `capacity=32` olarak sınırlandırılmıştır. Ses donanımdan çaldıkça kuyruk kontrollü olarak boşaltılır ve asenkron yapının akıcılığı bellek şişmeden (memory leak) korunur.
 - **Vektörize AudioFormat Dönüşümü:** Ses genlik sınırlama (clipping) ve `PCM16 Little-Endian` dönüşümleri, ağır Python `for` döngülerinden arındırılarak NumPy tabanlı SIMD operasyonları ile donanım hızında (**O(N)** optimum) gerçekleştirilir.
-- **TextBuffer Yönetimi:** LLM (büyük dil modeli) çıktılarındaki token birleştirmeleri yavaş string eklemeleri yerine, liste yönetimi ile O(1) zamanında ele alınır. Sadece cümleler hazır olduğunda düzenli ifadelerden (regex) geçirilir.
+- **Akıllı Metin Tamponu ve Cümle Bölme (TextBuffer):** LLM çıktılarından gelen harf/kelime token'ları dinamik olarak yakalanıp O(1) maliyetle işlenir:
+  - **Noktalama Bazlı Bölme:** `.`, `?`, `!`, `\n` gibi cümle sonu işaretlerine göre doğal konuşma parçalarına ayrılır.
+  - **`min_chars` Koruması:** Çok kısa kelimelerin (ör. "Hmm.") tek başına gönderilip bağlamdan kopmasını engeller.
+  - **`flush_timeout` (Zaman Aşımı):** Eğer LLM belirli bir süre kelime üretmezse, bekleyen eksik metinler zorla fırlatılıp üretime gönderilir.
 
-### 2. Çoklu GPU Havuzu (Resource Pooling)
+### 2. Asenkron Kesintisiz Oynatma ve Yumuşak Geçişler
+- **Stutter-Free Playback:** Mimarimiz `sounddevice.RawOutputStream` ve bir arka plan iş parçacığı (Thread) kullanarak sesi üretildiği anda GPU hızını kilitlemeden arka planda pürüzsüz bir şekilde çalmaya başlar.
+- **Overlap-Add Süzgeçleri:** Küçük parçalar (chunk) halinde üretilen ses blokları art arda eklenirken oluşan rahatsız edici çıt/pıt (pop/click) seslerini önlemek için blokların uçları üst üste bindirilir ve son derece yumuşak akustik geçişler sağlanır.
+
+### 3. Çoklu GPU Havuzu (Resource Pooling)
 5'e kadar (veya daha fazla) GPU'yu yatay olarak yönetebilen **Object Pool Pattern** (`VoxCPMEnginePool`) uygulanmıştır. Gelen bir istek asenkron bir kuyruk (`asyncio.Queue`) üzerinden bekletilmeden boştaki uygun GPU'ya kilitlenir. Hiçbir istek birbirini bloke etmez.
 
-### 3. Dinamik Fallback Mekanizması
+### 4. Dinamik Fallback Mekanizması
 Diyelim ki sistemde yüksek bir yük var, GPU'ların tamamı meşgul ve kuyruk konfigürasyondaki eşik değerini (`piper_fallback_queue_threshold` = 10) geçti. Bu durumda sistem, istek reddetmek yerine talebi eşzamanlı olarak CPU üzerinde çalışan ultra hızlı **Piper TTS** motoruna yönlendirir. İstemci bu yönlendirmeyi hissetmez ve sunucu her koşulda "hizmet kesintisi" (Denial of Service) olmadan çalışmaya devam eder.
 
 ---

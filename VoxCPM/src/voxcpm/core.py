@@ -9,7 +9,7 @@ import tempfile
 import time
 import numpy as np
 import logging
-from typing import Generator, Optional
+from typing import Generator, Optional, Union
 from huggingface_hub import snapshot_download
 from .model.voxcpm import VoxCPMModel, LoRAConfig
 from .model.voxcpm2 import VoxCPM2Model
@@ -19,7 +19,7 @@ import logging
 logger = logging.getLogger("TTS_SYSTEM")
 from .config_loader import config_instance, StreamingConfigModel
 from .streaming import AudioChunk, AudioFormatConverter, RingBuffer
-from .text_buffer import StreamingTextSource
+from .text_buffer import TextBuffer, StreamingTextSource
 
 class VoxCPM:
     def __init__(
@@ -341,6 +341,14 @@ class VoxCPM:
         reference_wav_path: str = None,
         cfg_value: Optional[float] = None,
         inference_timesteps: Optional[int] = None,
+        min_len: Optional[int] = None,
+        max_len: Optional[int] = None,
+        normalize: bool = False,
+        denoise: bool = False,
+        retry_badcase: Optional[bool] = None,
+        retry_badcase_max_times: Optional[int] = None,
+        retry_badcase_ratio_threshold: Optional[float] = None,
+        seed: Optional[int] = None,
     ) -> Generator[AudioChunk, None, None]:
         """Synthesizes text sequentially from a continuous stream of incoming tokens."""
         cfg = streaming_config or config_instance.streaming
@@ -383,7 +391,15 @@ class VoxCPM:
                     prompt_text=actual_prompt_txt,
                     reference_wav_path=reference_wav_path,
                     cfg_value=cfg_value,
-                    inference_timesteps=inf_steps
+                    inference_timesteps=inf_steps,
+                    min_len=min_len,
+                    max_len=max_len,
+                    normalize=normalize,
+                    denoise=denoise,
+                    retry_badcase=retry_badcase,
+                    retry_badcase_max_times=retry_badcase_max_times,
+                    retry_badcase_ratio_threshold=retry_badcase_ratio_threshold,
+                    seed=seed,
                 )
                 
                 full_sentence_audio_np = []
@@ -459,6 +475,98 @@ class VoxCPM:
                         os.unlink(tmp_path)
                     except OSError:
                         pass
+
+    def generate_smart(
+        self,
+        text: str,
+        *,
+        streaming: bool = True,
+        reference_wav_path: Optional[str] = None,
+        prompt_wav_path: Optional[str] = None,
+        prompt_text: Optional[str] = None,
+        cfg_value: Optional[float] = None,
+        inference_timesteps: Optional[int] = None,
+        min_len: Optional[int] = None,
+        max_len: Optional[int] = None,
+        normalize: bool = False,
+        denoise: bool = False,
+        retry_badcase: Optional[bool] = None,
+        retry_badcase_max_times: Optional[int] = None,
+        retry_badcase_ratio_threshold: Optional[float] = None,
+        output_format: str = "pcm16_le",
+        chunk_duration_ms: int = 200,
+        enable_lookbehind: bool = True,
+        lookbehind_mode: str = "anchor",
+        sentence_delimiters: str = ".?!…\n",
+        flush_timeout_ms: float = 300.0,
+        min_chars: int = 5,
+        seed: Optional[int] = None,
+    ) -> Generator[Union[bytes, np.ndarray], None, None] | Union[bytes, np.ndarray]:
+        """Unified speech generation using all optimized streaming, lookbehind, and sentence-splitting features.
+        
+        If streaming=True, returns a generator yielding audio segments in output_format.
+        If streaming=False, returns a single concatenated array or byte sequence.
+        """
+        # For non-streaming WAV, we must synthesize as numpy first to create a single valid WAV file
+        actual_format = "numpy" if (not streaming and output_format == "wav") else output_format
+
+        cfg = StreamingConfigModel(
+            chunk_duration_ms=chunk_duration_ms,
+            output_format=actual_format,
+            enable_lookbehind=enable_lookbehind,
+            lookbehind_mode=lookbehind_mode
+        )
+
+        text_buffer = TextBuffer(
+            sentence_delimiters=sentence_delimiters,
+            flush_timeout_ms=flush_timeout_ms,
+            min_chars=min_chars
+        )
+        text_source = StreamingTextSource(text_buffer)
+        text_source.push_text(text)
+        text_source.finish()
+
+        generator = self.generate_stream_from_text_source(
+            text_source=text_source,
+            streaming_config=cfg,
+            prompt_wav_path=prompt_wav_path,
+            prompt_text=prompt_text,
+            reference_wav_path=reference_wav_path,
+            cfg_value=cfg_value,
+            inference_timesteps=inference_timesteps,
+            min_len=min_len,
+            max_len=max_len,
+            normalize=normalize,
+            denoise=denoise,
+            retry_badcase=retry_badcase,
+            retry_badcase_max_times=retry_badcase_max_times,
+            retry_badcase_ratio_threshold=retry_badcase_ratio_threshold,
+            seed=seed,
+        )
+
+        from typing import Union
+        if streaming:
+            def _yield_chunks():
+                for chunk in generator:
+                    if chunk.data is not None and len(chunk.data) > 0:
+                        yield chunk.data
+            return _yield_chunks()
+        else:
+            chunks = []
+            for chunk in generator:
+                if chunk.data is not None and len(chunk.data) > 0:
+                    chunks.append(chunk.data)
+
+            if not chunks:
+                return b"" if output_format != "numpy" else np.array([], dtype=np.float32)
+
+            if actual_format == "numpy":
+                combined = np.concatenate(chunks, axis=-1)
+                if output_format == "wav":
+                    return AudioFormatConverter.convert(combined, self.tts_model.sample_rate, "wav")
+                return combined
+            else:
+                return b"".join(chunks)
 
     def _generate(
         self,

@@ -1,0 +1,114 @@
+import os
+import sys
+import threading
+import numpy as np
+import sounddevice as sd
+
+# --- PROFESSIONAL FIX: Yerel VoxCPM Paketini Zorunlu Kıl ---
+# Global site-packages altındaki eski voxcpm paketinin import edilmesini engellemek ve 
+# projedeki güncel VoxCPM/src dizinini kullanmak için sys.path'in en başına ekliyoruz.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+voxcpm_src = os.path.abspath(os.path.join(current_dir, "..", "VoxCPM", "src"))
+if voxcpm_src not in sys.path:
+    sys.path.insert(0, voxcpm_src)
+# ------------------------------------------------------------
+
+from voxcpm import VoxCPM
+from voxcpm.streaming import RingBuffer
+
+
+class VoxTrendyol:
+    """
+    VoxCPM altyapısını kullanarak gelişmiş TextBuffer, RingBuffer, Overlap-Add ve
+    asenkron ses oynatma sistemlerini tek bir çatı altında toplayan sarmalayıcı sınıf.
+    """
+
+    def __init__(self, model_path: str = "Trendyol_TTS", load_denoiser: bool = False):
+        self.model = VoxCPM.from_pretrained(model_path, load_denoiser=load_denoiser)
+        self.sample_rate = self.model.tts_model.sample_rate
+
+    def smart_generate_streaming(
+        self,
+        text: str,
+        ref_audio: str = None,
+        prompt_audio: str = None,
+        prompt_text: str = None,
+        cfg_value: float = 2.0,
+        inference_timesteps: int = 10,
+        chunk_duration_ms: int = 200,
+        enable_lookbehind: bool = True,
+        lookbehind_mode: str = "anchor",
+        seed: int = 42,
+        play: bool = True,
+    ) -> np.ndarray:
+        """
+        Sesi üretir ve eğer play=True ise asenkron olarak arka planda takılmadan (stutter-free) çalar.
+        İşlem sonunda tüm ses verisini (WAV formatında) tek parça numpy dizisi olarak geri döndürür.
+        Bu fonksiyon içte halihazırda var olan TextBuffer, RingBuffer, Overlap-Add ve RawOutputStream mimarisini kullanır.
+        """
+        # 1. Zaten var olan asenkron TextBuffer ve Overlap süzgeçleri üzerinden generator'ı başlat
+        chunks_generator = self.model.generate_smart(
+            text=text,
+            streaming=True,
+            reference_wav_path=ref_audio,
+            prompt_wav_path=prompt_audio,
+            prompt_text=prompt_text,
+            cfg_value=cfg_value,
+            inference_timesteps=inference_timesteps,
+            chunk_duration_ms=chunk_duration_ms,
+            enable_lookbehind=enable_lookbehind,
+            lookbehind_mode=lookbehind_mode,
+            seed=seed,
+        )
+
+        # Dönüş için toplayacağımız tüm ses blokları
+        all_chunks = []
+
+        if not play:
+            # Sadece üretim isteniyorsa doğrudan toplayıp dön
+            for chunk in chunks_generator:
+                all_chunks.append(chunk)
+        else:
+            # 2. Özel RingBuffer (streaming.py) ile Asenkron Oynatma Kuyruğu (Queue)
+            # Kapasite, asenkron yapının akıcılığını koruması için 32 olarak belirlendi
+            buffer = RingBuffer(capacity=32)
+
+            def producer():
+                for chunk in chunks_generator:
+                    # RingBuffer'a chunk ekle (kuyruk dolarsa blocklanır, bellek şişmez)
+                    buffer.put(chunk)
+                # Üretim bitti sinyali (sentinel)
+                buffer.put(None)
+
+            # GPU hızını kitlemeden üretimi ayrı thread'de başlatıyoruz
+            t = threading.Thread(target=producer)
+            t.start()
+
+            print("--- Ses oynatımı asenkron olarak başlıyor ---", file=sys.stderr)
+            # Ana thread üzerinde sesi kesintisiz (stutter-free) çalıyoruz
+            with sd.RawOutputStream(
+                samplerate=self.sample_rate, channels=1, dtype="int16"
+            ) as stream:
+                while True:
+                    # RingBuffer'dan veri al (Boşsa blocklanır ve bekler)
+                    chunk = buffer.get()
+                    if chunk is None:
+                        break
+
+                    # Hem çal hem de listeye ekle
+                    stream.write(chunk)
+                    all_chunks.append(chunk)
+
+            t.join()
+
+        # Elde edilen byte dizilerini (pcm16_le) birleştir
+        if len(all_chunks) == 0:
+            return np.array([], dtype=np.int16)
+
+        full_audio_bytes = b"".join(all_chunks)
+        # Oynatılabilir / Kaydedilebilir numpy int16 array'e çevir
+        # NOT: soundfile kütüphanesinin (sf.write) WAV formatında doğru header yazabilmesi
+        # için numpy array dönmek zorundayız. numpy'da pcm16_le'nin karşılığı np.int16'dır.
+        audio_array = np.frombuffer(full_audio_bytes, dtype=np.int16)
+
+        return audio_array
