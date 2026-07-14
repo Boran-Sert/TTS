@@ -117,7 +117,7 @@ from Trendyol_TTS.voxtrendyol import VoxTrendyol
 vt = VoxTrendyol(model_path="Trendyol-TTS")
 
 # 2. Üretilecek Metin ve Klonlanacak Ses (Referans)
-text_to_speak = "Mastercard kredi kartımda bu ay ödemem gereken 18.450 TL borç bulunuyor."
+text_to_speak = "Hayvanlar için hayatlarını tehlikeye atmaya hazır insanlar var; aynı zamanda tuhaf, kötü ve çirkin."
 ref_audio = "ceren.wav/ceren.wav"
 ref_text = "Hayvanlar için hayatlarını tehlikeye atmaya hazır insanlar var."
 
@@ -131,7 +131,8 @@ wav_output = vt.smart_generate_streaming(
     inference_timesteps=6,    # Hız/Kalite ayarı
     chunk_duration_ms=200,    # Streaming parça boyutu (ms)
     seed=42,                  # Tutarlılık
-    play=True                 # Anında, takılmadan asenkron çalmaya başla!
+    play=True,                # Ses oynatma
+    lookbehind_mode="anchor", # Ses akışında tutarlılık (Diksiyon,duygu vb.)
 )
 
 # 4. (Opsiyonel) Çıktıyı Sonradan Kaydedin
