@@ -117,9 +117,22 @@ from Trendyol_TTS.voxtrendyol import VoxTrendyol
 vt = VoxTrendyol(model_path="Trendyol-TTS")
 
 # 2. Üretilecek Metin ve Klonlanacak Ses (Referans)
-text_to_speak = "Hayvanlar için hayatlarını tehlikeye atmaya hazır insanlar var; aynı zamanda tuhaf, kötü ve çirkin."
-ref_audio = "ceren.wav/ceren.wav"
-ref_text = "Hayvanlar için hayatlarını tehlikeye atmaya hazır insanlar var."
+text_to_speak = "Mastercard kredi kartımda bu ay ödemem gereken 18.450 TL borç bulunuyor ve son ödeme tarihini kaçırmamak için ödeme planımı buna göre hazırladım. Zero Kartımda 7.980 TL dönem borcu görünüyor; bu tutarın tamamını son ödeme tarihinden önce kapatmayı planlıyorum. Happy Temassız Kartımda ise 2.340 TL borç bulunuyor, tüm kart borçlarımı düzenli takip ederek gecikme faizi oluşmasını önlemeye özen gösteriyorum."
+
+    # Klonlanacak ses yolu
+    ref_ses = (
+        r"voices/zeynep.wav"
+        if os.path.exists(r"voices/zeynep.wav")
+        else None
+    )
+
+    # Klonlanacak sesin içindeki transkript (Ne söylediği)
+    ref_metin = (
+        "Hayvanlar için hayatlarını tehlikeye atmaya hazır insanlar var; aynı zamanda tuhaf, kötü ve çirkin."
+        if ref_ses
+        else None
+    )
+
 
 # 3. Akışı ve Oynatmayı Başlat
 wav_output = vt.smart_generate_streaming(

@@ -3,6 +3,13 @@ import subprocess
 import sys
 import urllib.request
 
+def get_current_branch():
+    try:
+        branch = subprocess.check_output("git branch --show-current", shell=True, stderr=subprocess.DEVNULL).decode().strip()
+        return branch if branch else "main"
+    except Exception:
+        return "main"
+
 def run_command(command, description):
     print(f"\n[*] {description}...")
     try:
@@ -15,7 +22,7 @@ def run_command(command, description):
 
 def check_and_download_trendyol_tts():
     print("\n[*] Trendyol-TTS model ağırlıkları kontrol ediliyor...")
-    model_dir = "Trendyol-TTS"
+    model_dir = "Trendyol_TTS"
     safetensors_path = os.path.join(model_dir, "model.safetensors")
     pth_path = os.path.join(model_dir, "audiovae.pth")
     
@@ -69,11 +76,19 @@ def main():
     print("TTS Sistemi Kurulum ve İndirme Betiği")
     print("="*50)
     
-    # 1. Kök dizin bağımlılıklarını kur (FastAPI, websockets, piper-tts vb.)
+    branch = get_current_branch()
+    print(f"[*] Mevcut Git branch'i tespit edildi: {branch}")
+    
+    # 1. Kök dizin temel bağımlılıklarını kur
     if os.path.isfile("requirements.txt"):
-        run_command(f"{sys.executable} -m pip install -r requirements.txt", "requirements.txt bağımlılıkları yükleniyor")
+        run_command(f"{sys.executable} -m pip install -r requirements.txt", "Temel requirements.txt bağımlılıkları yükleniyor")
     else:
         print("[-] requirements.txt bulunamadı, bu adım atlanıyor.")
+        
+    if branch == "main":
+        run_command(f"{sys.executable} -m pip install fastapi uvicorn websockets jinja2 piper-tts", "Main branch için API bağımlılıkları yükleniyor")
+    else:
+        print(f"[*] '{branch}' ortamı tespit edildi. API ve sunucu gereksinimleri (fastapi, websockets vb.) atlanıyor.")
         
     # 2. VoxCPM model kütüphanesini ve kendi bağımlılıklarını kur
     if os.path.isdir("VoxCPM"):
@@ -84,8 +99,11 @@ def main():
     # 3. Trendyol TTS Model dosyalarını kontrol et ve eksikse indir
     check_and_download_trendyol_tts()
     
-    # 4. Piper Fallback Model dosyalarını kontrol et ve eksikse indir
-    check_and_download_piper_model()
+    # 4. Piper Fallback Model dosyalarını kontrol et ve eksikse indir (Sadece main branch)
+    if branch == "main":
+        check_and_download_piper_model()
+    else:
+        print(f"[*] '{branch}' ortamında Piper Fallback motoru kullanılmadığı için indirme atlanıyor.")
     
     print("\n" + "="*50)
     print("[+] Kurulum işlemleri tamamlandı! Servisi başlatmak için aşağıdaki komutu kullanabilirsiniz:")
