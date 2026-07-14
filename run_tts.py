@@ -24,8 +24,8 @@ if __name__ == "__main__":
         prompt_audio=ref_ses,
         prompt_text=ref_metin,
         cfg_value=2.2,
-        inference_timesteps=6,  # Düşük olmasının sebebi güçsüz bir bilgisayarda takılmadan sistemin test edilmesi için
-        chunk_duration_ms=300,
+        inference_timesteps=5,  # Düşük olmasının sebebi güçsüz bir bilgisayarda takılmadan sistemin test edilmesi için
+        chunk_duration_ms=100,
         seed=42,
         play=True,
         lookbehind_mode="anchor",

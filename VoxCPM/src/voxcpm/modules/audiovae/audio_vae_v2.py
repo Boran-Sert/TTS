@@ -8,6 +8,8 @@ import torch.nn.functional as F
 from torch.nn.utils import weight_norm
 from pydantic import BaseModel
 
+torch.set_float32_matmul_precision("high")
+
 
 def WNConv1d(*args, **kwargs):
     return weight_norm(nn.Conv1d(*args, **kwargs))
@@ -73,7 +75,9 @@ def init_weights(m):
 
 
 class CausalResidualUnit(nn.Module):
-    def __init__(self, dim: int = 16, dilation: int = 1, kernel: int = 7, groups: int = 1):
+    def __init__(
+        self, dim: int = 16, dilation: int = 1, kernel: int = 7, groups: int = 1
+    ):
         super().__init__()
         pad = ((7 - 1) * dilation) // 2
         self.block = nn.Sequential(
@@ -138,7 +142,9 @@ class CausalEncoder(nn.Module):
         for stride in strides:
             d_model *= 2
             groups = d_model // 2 if depthwise else 1
-            self.block += [CausalEncoderBlock(output_dim=d_model, stride=stride, groups=groups)]
+            self.block += [
+                CausalEncoderBlock(output_dim=d_model, stride=stride, groups=groups)
+            ]
 
         groups = d_model if depthwise else 1
 
@@ -258,11 +264,16 @@ class SampleRateConditionLayer(nn.Module):
 
     def forward(self, x, sr_cond):
         if self.cond_type == "scale_bias" or self.cond_type == "scale_bias_init":
-            x = x * self.scale_embed(sr_cond).unsqueeze(-1) + self.bias_embed(sr_cond).unsqueeze(-1)
+            x = x * self.scale_embed(sr_cond).unsqueeze(-1) + self.bias_embed(
+                sr_cond
+            ).unsqueeze(-1)
         elif self.cond_type == "add":
             x = x + self.cond_embed(sr_cond).unsqueeze(-1)
         elif self.cond_type == "concat":
-            x = torch.cat([x, self.cond_embed(sr_cond).unsqueeze(-1).repeat(1, 1, x.shape[-1])], dim=1)
+            x = torch.cat(
+                [x, self.cond_embed(sr_cond).unsqueeze(-1).repeat(1, 1, x.shape[-1])],
+                dim=1,
+            )
 
         return self.out_layer(x)
 
@@ -286,7 +297,13 @@ class CausalDecoder(nn.Module):
         # Add first conv layer
         if depthwise:
             layers = [
-                WNCausalConv1d(input_channel, input_channel, kernel_size=7, padding=3, groups=input_channel),
+                WNCausalConv1d(
+                    input_channel,
+                    input_channel,
+                    kernel_size=7,
+                    padding=3,
+                    groups=input_channel,
+                ),
                 WNCausalConv1d(input_channel, channels, kernel_size=1),
             ]
         else:
@@ -320,7 +337,9 @@ class CausalDecoder(nn.Module):
         else:
             self.model = nn.ModuleList(layers)
 
-            self.register_buffer("sr_bin_boundaries", torch.tensor(sr_bin_boundaries, dtype=torch.int32))
+            self.register_buffer(
+                "sr_bin_boundaries", torch.tensor(sr_bin_boundaries, dtype=torch.int32)
+            )
             self.sr_bin_buckets = len(sr_bin_boundaries) + 1
 
             cond_layers = []
@@ -469,7 +488,9 @@ class AudioVAE(nn.Module):
         if self.sr_bin_boundaries is not None:
             # use default output sample rate
             if sr_cond is None:
-                sr_cond = torch.tensor([self.out_sample_rate], device=z.device, dtype=torch.int32)
+                sr_cond = torch.tensor(
+                    [self.out_sample_rate], device=z.device, dtype=torch.int32
+                )
         return self.decoder(z, sr_cond)
 
     def streaming_decode(self):
@@ -536,7 +557,10 @@ class StreamingVAEDecoder:
                 if pad > 0:
                     self._patch_causal_conv(mod, pad)
             elif isinstance(mod, CausalTransposeConv1d):
-                trim = mod._CausalTransposeConv1d__padding * 2 - mod._CausalTransposeConv1d__output_padding
+                trim = (
+                    mod._CausalTransposeConv1d__padding * 2
+                    - mod._CausalTransposeConv1d__output_padding
+                )
                 ctx = (mod.kernel_size[0] - 1) // mod.stride[0]
                 if ctx > 0:
                     self._patch_transpose_conv(mod, ctx, trim)
@@ -547,11 +571,20 @@ class StreamingVAEDecoder:
         orig = mod.forward
 
         def fwd(x, _k=key, _p=pad_size, _m=mod):
-            x_pad = torch.cat([states[_k], x], dim=-1) if _k in states else F.pad(x, (_p, 0))
+            x_pad = (
+                torch.cat([states[_k], x], dim=-1)
+                if _k in states
+                else F.pad(x, (_p, 0))
+            )
             if x.shape[-1] >= _p:
                 states[_k] = x[:, :, -_p:].detach()
             else:
-                prev = states.get(_k, torch.zeros(x.shape[0], x.shape[1], _p, device=x.device, dtype=x.dtype))
+                prev = states.get(
+                    _k,
+                    torch.zeros(
+                        x.shape[0], x.shape[1], _p, device=x.device, dtype=x.dtype
+                    ),
+                )
                 states[_k] = torch.cat([prev, x], dim=-1)[:, :, -_p:].detach()
             return nn.Conv1d.forward(_m, x_pad)
 
@@ -564,7 +597,11 @@ class StreamingVAEDecoder:
         orig = mod.forward
 
         def fwd(x, _k=key, _c=ctx, _t=trim, _m=mod):
-            x_full = torch.cat([states[_k], x], dim=-1) if _k in states else F.pad(x, (_c, 0))
+            x_full = (
+                torch.cat([states[_k], x], dim=-1)
+                if _k in states
+                else F.pad(x, (_c, 0))
+            )
             states[_k] = x[:, :, -_c:].detach()
             out = nn.ConvTranspose1d.forward(_m, x_full)
             left = _c * _m.stride[0]

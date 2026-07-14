@@ -4,14 +4,11 @@ import threading
 import numpy as np
 import sounddevice as sd
 
-# --- PROFESSIONAL FIX: Yerel VoxCPM Paketini Zorunlu Kıl ---
-# Global site-packages altındaki eski voxcpm paketinin import edilmesini engellemek ve 
-# projedeki güncel VoxCPM/src dizinini kullanmak için sys.path'in en başına ekliyoruz.
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 voxcpm_src = os.path.abspath(os.path.join(current_dir, "..", "VoxCPM", "src"))
 if voxcpm_src not in sys.path:
     sys.path.insert(0, voxcpm_src)
-# ------------------------------------------------------------
 
 from voxcpm import VoxCPM
 from voxcpm.streaming import RingBuffer

@@ -91,20 +91,6 @@ Sisteminizin davranışını `tts_config.json` dosyası üzerinden en ince detay
 
 ## 🏃‍♂️ Sistemi Başlatma ve Kullanım
 
-### Sunucuyu Başlatmak
-Tüm kurulum ve yapılandırma adımlarından sonra servisi ayağa kaldırmak için ana dizindeyken şu komutu çalıştırın:
-```bash
-python -m service.main
-```
-Bu komut, yapılandırmanıza göre modelleri belleğe yükleyecek (GPU ve CPU) ve FastAPI & WebSocket sunucusunu başlatacaktır.
-
-### İstemci (Client) ile Bağlantı Kurmak
-Servis ayağa kalktıktan sonra, WebSocket üzerinden asenkron metin gönderip, ses verisini stream (akış) olarak alabilirsiniz. Proje dizininde veya farklı bir projede örnek bir bağlantı için `client.py` dosyasını inceleyebilirsiniz.
-
-Sistem, istemci ile **Multiplexed WebSockets** üzerinden konuşur:
-1. **Text Frame (JSON):** Kontrol mesajları, metadata, bağlantı durumu ve cümle sonu bildirimleri.
-2. **Binary Frame (Raw Bytes):** Saf, Little-Endian formatta `PCM16` ses verisi taşır. Bu sayede iOS, Android, .NET veya Java gibi farklı istemciler bu byteları alıp doğrudan donanım ses kuyruğuna yazabilirler.
-
 ### Python İçerisinden Doğrudan Kullanım (Asenkron Oynatma)
 Sistemi doğrudan bir Python projesine entegre etmek ve arka planda gecikmesiz olarak çalıştırmak oldukça basittir. Tıpkı `run_tts.py` içerisinde olduğu gibi `VoxTrendyol` sarmalayıcısını kullanabilirsiniz:
 
@@ -119,14 +105,10 @@ vt = VoxTrendyol(model_path="Trendyol-TTS")
 # 2. Üretilecek Metin ve Klonlanacak Ses (Referans)
 text_to_speak = "Mastercard kredi kartımda bu ay ödemem gereken 18.450 TL borç bulunuyor ve son ödeme tarihini kaçırmamak için ödeme planımı buna göre hazırladım. Zero Kartımda 7.980 TL dönem borcu görünüyor; bu tutarın tamamını son ödeme tarihinden önce kapatmayı planlıyorum. Happy Temassız Kartımda ise 2.340 TL borç bulunuyor, tüm kart borçlarımı düzenli takip ederek gecikme faizi oluşmasını önlemeye özen gösteriyorum."
 
-    # Klonlanacak ses yolu
-    ref_ses = (
-        r"voices/zeynep.wav"
-        if os.path.exists(r"voices/zeynep.wav")
-        else None
-    )
+    # Klonlanacak ses yolu (Sadece .wav dosyasının ismni değişitirerek yeni sesler eklenebilir)
+    ref_ses = r"voices/zeynep.wav" if os.path.exists(r"voices/zeynep.wav") else None
 
-    # Klonlanacak sesin içindeki transkript (Ne söylediği)
+    # Klonlanacak sesin içindeki transkript (Ne söylediği) (Ses değişitirirken burayı da değiştirmeyi unutmayın)
     ref_metin = (
         "Hayvanlar için hayatlarını tehlikeye atmaya hazır insanlar var; aynı zamanda tuhaf, kötü ve çirkin."
         if ref_ses
