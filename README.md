@@ -137,3 +137,7 @@ Projeyi daha da ileriye taşımak için mimarimize eklenecek sıradaki özellikl
    - WebSocket akışına alternatif olarak, özellikle kurumsal .NET ve Java mikroservis mimarileriyle %100 uyumlu ve daha hafif (low overhead) iletişim kurmak için **Protocol Buffers (gRPC)** adaptörünün sisteme eklenmesi.
 4. **Gelişmiş Kimlik Doğrulama ve Güvenlik:**
    - İstek kısıtlamaları (rate-limiting) ve OAuth2/JWT gibi kurumsal yetkilendirme standartlarının direkt Dependency Injection katmanına API Gateway entegrasyonu olarak kazandırılması.
+
+> [!NOTE]
+> **Geliştirme Notu**
+> En yeni özellikler ve devam eden geliştirmeler için **`dev`** branch'ini inceleyebilirsiniz. Deneysel değişiklikler ve yeni özellikler önce burada geliştirilip test edildikten sonra **`main`** branch'ine aktarılır.
