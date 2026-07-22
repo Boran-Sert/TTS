@@ -9,6 +9,9 @@ venv/
 .venv/
 env/
 ENV/
+*.idea
+.vscode/
+
 
 # Large model files / weights (over GitHub's file limit)
 *.safetensors

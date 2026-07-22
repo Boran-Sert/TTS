@@ -3,35 +3,59 @@ import soundfile as sf
 from Trendyol_TTS.voxtrendyol import VoxTrendyol
 
 
-if __name__ == "__main__":
-    text_okunucak = "Mastercard kredi kartımda bu ay ödemem gereken 18.450 TL borç bulunuyor ve son ödeme tarihini kaçırmamak için ödeme planımı buna göre hazırladım. Zero Kartımda 7.980 TL dönem borcu görünüyor; bu tutarın tamamını son ödeme tarihinden önce kapatmayı planlıyorum. Happy Temassız Kartımda ise 2.340 TL borç bulunuyor, tüm kart borçlarımı düzenli takip ederek gecikme faizi oluşmasını önlemeye özen gösteriyorum."
+def speak(
+    text: str,
+    ref_audio: str = r"voices/zeynep.wav",
+    ref_text: str = "Hayvanlar için hayatlarını tehlikeye atmaya hazır insanlar var; aynı zamanda tuhaf, kötü ve çirkin.",
+    output_filename: str = "voice_design.wav",
+    play: bool = True,
+    cfg_value: float = 2.8,
+    inference_timesteps: int = 4,
+    chunk_duration_ms: int = 150,
+    enable_lookbehind: bool = True,
+    lookbehind_mode: str = "anchor",
+    seed: int = 42,
+    normalize_text: bool = True,
+    model_path: str = "Trendyol_TTS",
+):
+    """Metni sese dönüştürür, arka planda çalar ve WAV olarak kaydeder."""
+    ref_path = ref_audio if (ref_audio and os.path.exists(ref_audio)) else None
+    ref_prompt = ref_text if ref_path else None
 
-    # Klonlanacak ses
-    ref_ses = r"voices/zeynep.wav" if os.path.exists(r"voices/zeynep.wav") else None
-
-    # Klonlanacak sesin içindeki transkript (Ne söylediği)
-    ref_metin = (
-        "Hayvanlar için hayatlarını tehlikeye atmaya hazır insanlar var; aynı zamanda tuhaf, kötü ve çirkin."
-        if ref_ses
-        else None
-    )
-
-    vt = VoxTrendyol("Trendyol_TTS")
-    # Hem asenkron oynatır (play=True), hem TextBuffer/RingBuffer kullanır, hem de wav döner
+    vt = VoxTrendyol(model_path)
     wav = vt.smart_generate_streaming(
-        text=text_okunucak,
-        ref_audio=ref_ses,
-        prompt_audio=ref_ses,
-        prompt_text=ref_metin,
-        cfg_value=2.2,
-        inference_timesteps=5,  # Düşük olmasının sebebi güçsüz bir bilgisayarda takılmadan sistemin test edilmesi için
-        chunk_duration_ms=100,
-        seed=42,
-        play=True,
-        lookbehind_mode="anchor",
+        text=text,
+        ref_audio=ref_path,
+        prompt_audio=ref_path,
+        prompt_text=ref_prompt,
+        cfg_value=cfg_value,
+        inference_timesteps=inference_timesteps,
+        chunk_duration_ms=chunk_duration_ms,
+        enable_lookbehind=enable_lookbehind,
+        lookbehind_mode=lookbehind_mode,
+        seed=seed,
+        play=play,
+        normalize_text=normalize_text,
     )
 
-    # Elde edilen wav çıktısını kaydet
-    output_filename = "voice_design.wav"
-    sf.write(output_filename, wav, vt.sample_rate)
-    print(f"Kayıt tamamlandı: {output_filename}")
+    if output_filename and len(wav) > 0:
+        sf.write(output_filename, wav, vt.sample_rate)
+        print(f"[SUCCESS] Ses kaydedildi: {output_filename}")
+
+    return wav
+
+
+if __name__ == "__main__":
+    text_okunacak = (
+        "1. Türkiye Finans WorldCard (Dönem Borcu: 3.450 TL) "
+        "2. Türkiye Finans Platinum Kart (Dönem Borcu: 2.800 TL) "
+        "Ayrıca, ödemeyi hangi hesaptan yapacağınızı da belirtin."
+    )
+
+    speak(text_okunacak)
+
+
+
+
+
+
